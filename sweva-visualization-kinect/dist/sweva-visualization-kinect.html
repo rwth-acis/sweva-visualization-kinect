@@ -98,12 +98,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             <div id="canvas"></div>
             <div id="pad" class="overlay">
                 <div class="flexed">
-                    <div id="humcount" class="flex-item" style="width: 25%">Menschen: 0</div>
-                    <div id="mindist" class="flex-item" style="width: 25%">Abstand: INFINITY</div>
-                    <div id="markers" class="flex-item" style="width: 25%">Erkannte Marker: 0</div>
-                    <div class="flex-item" style="width: 25%"><label><input type="checkbox" id="camchange"
-                                                                            name="changecamera"/>Orthographic
-                        camera</label>
+                    <div id="humcount" class="flex-item" style="width: 20%">Menschen: 0</div>
+                    <div id="mindist" class="flex-item" style="width: 20%">Abstand: INFINITY</div>
+                    <div id="markers" class="flex-item" style="width: 20%">Erkannte Marker: 0</div>
+                    <div class="flex-item" style="width: 20%"><label><input type="checkbox" id="camchange"
+                                                                            name="changecamera"/>Parallelprojektion</label>
+                    </div>
+                    <div class="flex-item" style="width: 20%"><label><input type="checkbox" id="security"
+                                                                            name="changecamera"/>Sicherheitszone</label>
                     </div>
                     <!--<div class="flex-item" style="width: 25%">Hallo</div>-->
                 </div>
@@ -212,19 +214,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                     kugel.castShadow = true;
                     _ref.scene.add(kugel);
 
-                    //And the according "security" sphere
-                    var secSphereGeom = new THREE.SphereGeometry(point[3] + abs, 10, 10);
-                    //Make it transparent
-                    var secSphereMat = new THREE.MeshLambertMaterial({
-                        color: 0xff0000,
-                        transparent: true,
-                        opacity: 0.2
-                    });
-                    var secSphere = new THREE.Mesh(secSphereGeom, secSphereMat);
-                    secSphere.translateX(point[0]);
-                    secSphere.translateY(-point[2]);
-                    secSphere.translateZ(point[1]);
-                    _ref.scene.add(secSphere);
+
+                    if (_ref.showSecurity) {
+                        //And the according "security" sphere
+                        var secSphereGeom = new THREE.SphereGeometry(point[3] + abs, 10, 10);
+                        //Make it transparent
+                        var secSphereMat = new THREE.MeshLambertMaterial({
+                            color: 0xff0000,
+                            transparent: true,
+                            opacity: 0.2
+                        });
+                        var secSphere = new THREE.Mesh(secSphereGeom, secSphereMat);
+                        secSphere.translateX(point[0]);
+                        secSphere.translateY(-point[2]);
+                        secSphere.translateZ(point[1]);
+                        _ref.scene.add(secSphere);
+                    }
                 });
 
                 //Show the markers
@@ -399,6 +404,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 this.humCount = this.shadowRoot.querySelector('#humcount');
                 this.markers = this.shadowRoot.querySelector('#markers');
                 this.camChanger = this.shadowRoot.querySelector('#camchange');
+                this.securityChanger = this.shadowRoot.querySelector('#security');
                 this.webglCanvas = webglCanvas;
                 renderer.setSize(webglCanvas.width, webglCanvas.height);
                 webglCanvas.appendChild(renderer.domElement);
@@ -443,15 +449,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                         "data": _ref.testArray
                     }
                 };
-
+                this.showSecurity = false;
 
                 webglCanvas.addEventListener("wheel", function (ev) {
                     para.zoom += Math.sign(ev.wheelDelta) * 0.1;
-                    persp.zoom += Math.sign(ev.wheelDelta) *0.1;
-                    if(para.zoom < 0.1)para.zoom = 0.1;
-                    if(persp.zoom < 0.1)persp.zoom = 0.1;
-                    if(para.zoom > 10)para.zoom = 10;
-                    if(persp.zoom > 10)persp.zoom = 10;
+                    persp.zoom += Math.sign(ev.wheelDelta) * 0.1;
+                    if (para.zoom < 0.1) para.zoom = 0.1;
+                    if (persp.zoom < 0.1) persp.zoom = 0.1;
+                    if (para.zoom > 10) para.zoom = 10;
+                    if (persp.zoom > 10) persp.zoom = 10;
 
                     para.updateProjectionMatrix();
                     persp.updateProjectionMatrix();
@@ -459,19 +465,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 /**
                  * FOR TESTING ONLY SET THIS
                  */
+                //Changes the camera
                 $(_ref.camChanger).click(function () {
                     if ($(this).is(':checked')) {
                         _ref.camera = para;
-                        // para.zoom = persp.zoom;
-                        // para.position.x = -900;
-                        // para.position.y = 197;
-                        // para.position.z = 775;
-                        // para.rotation.x = 0.4379923527728886;
-                        // para.rotation.y = -1.0507797936834526;
-                        // para.rotation.z = -0.826454729390485;
-                        // para.updateProjectionMatrix();
                     } else {
                         _ref.camera = persp;
+                    }
+                });
+
+                //THIS IS ONLY WORKING IF THE SET METHOD IS CALLED WHILE RENDERING. For testing we only call the
+                //Method once.
+                $(_ref.securityChanger).click(function () {
+                    if ($(this).is(':checked')) {
+                        _ref.showSecurity = true;
+                    } else {
+                        _ref.showSecurity = false;
                     }
                 });
                 this.set(testMQTT);
@@ -481,7 +490,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                     _ref.paraControls.update();
                     // cube.rotation.x += 0.01;
                     // cube.rotation.y += 0.01;
-
                     // Render the scene
                     renderer.render(scene, _ref.camera);
                 };
