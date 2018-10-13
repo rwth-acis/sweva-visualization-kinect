@@ -115,6 +115,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </template>
     <!--<script src="http://d3js.org/d3.v3.min.js"></script>-->
     <script>
+        var abs = 10;
 
         /**
          * @customElement
@@ -200,6 +201,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 //Draw robot
                 var spheres = robot.spheres;
                 spheres.forEach(function (point) {
+                    //The bounding sphere of the robot
                     var spheregeometry = new THREE.SphereGeometry(point[3], 10, 10);
                     var spherematerial = new THREE.MeshLambertMaterial({color: 0x0000ff});
                     var kugel = new THREE.Mesh(spheregeometry, spherematerial);
@@ -209,6 +211,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                     kugel.receiveShadow = true;
                     kugel.castShadow = true;
                     _ref.scene.add(kugel);
+
+                    //And the according "security" sphere
+                    var secSphereGeom = new THREE.SphereGeometry(point[3] + abs, 10, 10);
+                    //Make it transparent
+                    var secSphereMat = new THREE.MeshLambertMaterial({
+                        color: 0xff0000,
+                        transparent: true,
+                        opacity: 0.2
+                    });
+                    var secSphere = new THREE.Mesh(secSphereGeom, secSphereMat);
+                    secSphere.translateX(point[0]);
+                    secSphere.translateY(-point[2]);
+                    secSphere.translateZ(point[1]);
+                    _ref.scene.add(secSphere);
                 });
 
                 //Show the markers
@@ -230,9 +246,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 _ref.scene.add(light);
 
                 //Should represent the kinect
-                var cubeBox = new THREE.BoxGeometry(40, 40, 40);
+                var cubeBox = new THREE.BoxGeometry(100, 40, 20);
                 var cubeMat = new THREE.MeshLambertMaterial({color: 0xFFDC00});
                 var cube = new THREE.Mesh(cubeBox, cubeMat);
+                cube.position.z = 20;
                 cube.add(new THREE.AxisHelper(1000));
                 cube.receiveShadow = true;
                 cube.castShadow = true;
@@ -248,14 +265,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 var size = 1000;
                 var divisions = 100;
 
-                var gridHelper = new THREE.GridHelper( size, divisions );
-                gridHelper.rotation.x = Math.PI/2;
-                _ref.scene.add( gridHelper );
+                var gridHelper = new THREE.GridHelper(size, divisions);
+                gridHelper.rotation.x = Math.PI / 2;
+                _ref.scene.add(gridHelper);
                 // _ref.scene.add(plane);
 
                 //Refresh the human count and the distance in the headbar
                 this.humCount.textContent = "Menschen: " + humans.count;
-                this.minDist.textContent = "Abstand: " + visdata.distance;
+                this.minDist.textContent = "Abstand: " + visdata.distance.toFixed(2) + "m";
                 this.markers.textContent = "Erkannte Marker: " + robot.markers.length;
 
                 //Some logging if needed
@@ -267,16 +284,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 this.$.content.textContent += this.getText(value);
             }
 
-            getText(value) {
-                var text = '';
-                if (typeof value === 'object') {
-                    text = JSON.stringify(value, null, 2);
-                } else {
-                    text = value;
-                }
-                return text;
-            }
-
+            //Recursive function for deleting the scene
+            //Adapted from: https://stackoverflow.com/questions/30359830/how-do-i-clear-three-js-scene
             clearThree(obj) {
                 while (obj.children.length > 0) {
                     this.clearThree(obj.children[0])
@@ -287,36 +296,44 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                 if (obj.texture) obj.texture.dispose();
             }
 
-            // Element behavior
 
+            //Handle resize
             resize(width, height) {
                 var _ref = this;
                 // console.log(width + ", " + height);
                 this.dimensions.width = width;
                 this.dimensions.height = height;
+                // this.webglCanvas.width = width;
+                // this.webglCanvas.height = height;
                 this.renderer.setSize(this.dimensions.width - 20, this.dimensions.height - 20);
+                // this.renderer.setSize(this.webglCanvas.width - 0, this.webglCanvas.height - 20);
 
-                // this.renderer.setSize(this.drawingSurface.width - 20, this.drawingSurface.height - 20);
-
-
-                // this.camera.aspect = ((this.dimensions.width - 20.0) / (this.dimensions.height - 20.0));
-                // this.camera.updateProjectionMatrix();
-                this.controls = new THREE.TrackballControls(_ref.camera, _ref.drawingSurface);
+                this.controls = new THREE.TrackballControls(this.persp, this.webglCanvas);
                 this.controls.rotateSpeed = 1.0;
                 this.controls.zoomSpeed = 1.2;
-                this.controls.panSpeed = 0.8;
+                this.controls.panSpeed = 0.6;
                 this.controls.noZoom = false;
                 this.controls.noPan = false;
-                this.controls.staticMoving = false;
-                this.controls.dynamicDampingFactor = 0.3;
+                this.controls.staticMoving = true;
+                this.controls.dynamicDampingFactor = 0.2;
                 this.controls.keys = [65, 83, 68];
+
+                this.paraControls = new THREE.TrackballControls(this.para, this.webglCanvas);
+                this.paraControls.rotateSpeed = 1.0;
+                this.paraControls.zoomSpeed = 1.2;
+                this.paraControls.panSpeed = 0.8;
+                this.paraControls.noZoom = false;
+                this.paraControls.noPan = false;
+                this.paraControls.staticMoving = false;
+                this.paraControls.dynamicDampingFactor = 0.2;
+                this.paraControls.keys = [65, 83, 68];
+
             }
 
 
             clear() {
                 var _ref = this;
                 this.clearThree(_ref.scene);
-                // this.svg.selectAll("*").remove();
             }
 
             ready() {
@@ -340,74 +357,68 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                     }
                 };
                 var _ref = this;
-                // ------------------------------------------------
-                // BASIC SETUP
-                // ------------------------------------------------
-                console.log("SETUP");
-                // Create an empty scene
+                // Setup the scene
                 var scene = new THREE.Scene();
                 this.scene = scene;
-                // Create a basic perspective camera
+
+                //Create the perspective...
                 var persp = new THREE.PerspectiveCamera(50, this.dimensions.width / this.dimensions.height, 0.1, 10000);
+                //Set position initially
                 persp.position.x = -900;
                 persp.position.y = 197;
                 persp.position.z = 775;
                 persp.rotation.x = 0.4379923527728886;
                 persp.rotation.y = -1.0507797936834526;
                 persp.rotation.z = -0.826454729390485;
+                // persp.up.set( 0, 0,1 );
 
-
-                var para = new THREE.OrthographicCamera(this.dimensions.width / -2, this.dimensions.width / 2, this.dimensions.height / 2, this.dimensions.height / -2, 0.1, 10000);
+                //... and the orthographic camera
+                var para = new THREE.OrthographicCamera(this.dimensions.width / -2, this.dimensions.width / 2, this.dimensions.height / 2, this.dimensions.height / -2, 0.0001, 1000000);
+                //Set position initially
                 para.position.x = -900;
                 para.position.y = 197;
                 para.position.z = 775;
                 para.rotation.x = 0.4379923527728886;
                 para.rotation.y = -1.0507797936834526;
                 para.rotation.z = -0.826454729390485;
+                this.para = para;
+                this.persp = persp;
+                //Start cam is perspective
                 this.camera = persp;
                 scene.add(para);
                 scene.add(persp);
                 // Create a renderer with Antialiasing
                 var renderer = new THREE.WebGLRenderer({antialias: true});
                 this.renderer = renderer;
-                // Configure renderer clear color
+                //Set white color
                 renderer.setClearColor("#ffffff");
 
-                // Configure renderer size
-
-
-                // Append Renderer to DOM
-                var drawingSurface = this.shadowRoot.querySelector('#canvas');
+                //Get DOM elements
+                var webglCanvas = this.shadowRoot.querySelector('#canvas');
                 this.minDist = this.shadowRoot.querySelector('#mindist');
                 this.humCount = this.shadowRoot.querySelector('#humcount');
                 this.markers = this.shadowRoot.querySelector('#markers');
                 this.camChanger = this.shadowRoot.querySelector('#camchange');
-                this.drawingSurface = drawingSurface;
-                renderer.setSize(drawingSurface.width, drawingSurface.height);
-                drawingSurface.appendChild(renderer.domElement);
-
-                // ------------------------------------------------
-                // FUN STARTS HERE
-                // ------------------------------------------------
-
+                this.webglCanvas = webglCanvas;
+                renderer.setSize(webglCanvas.width, webglCanvas.height);
+                webglCanvas.appendChild(renderer.domElement);
 
                 // Render Loop
-                this.controls = new THREE.TrackballControls(persp, drawingSurface);
+                this.controls = new THREE.TrackballControls(persp, webglCanvas);
                 this.controls.rotateSpeed = 1.0;
                 this.controls.zoomSpeed = 1.2;
-                this.controls.panSpeed = 0.8;
-                this.controls.noZoom = false;
+                this.controls.panSpeed = 0.2;
+                this.controls.noZoom = true;
                 this.controls.noPan = false;
-                this.controls.staticMoving = false;
+                this.controls.staticMoving = true;
                 this.controls.dynamicDampingFactor = 0.3;
                 this.controls.keys = [65, 83, 68];
 
-
-                this.paraControls = new THREE.TrackballControls(para, drawingSurface);
+                this.paraControls = new THREE.TrackballControls(para, webglCanvas);
                 this.paraControls.rotateSpeed = 1.0;
                 this.paraControls.zoomSpeed = 1.2;
                 this.paraControls.panSpeed = 0.8;
-                this.paraControls.noZoom = false;
+                this.paraControls.noZoom = true;
                 this.paraControls.noPan = false;
                 this.paraControls.staticMoving = false;
                 this.paraControls.dynamicDampingFactor = 0.3;
@@ -433,13 +444,32 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
                     }
                 };
 
+
+                webglCanvas.addEventListener("wheel", function (ev) {
+                    para.zoom += Math.sign(ev.wheelDelta) * 0.1;
+                    persp.zoom += Math.sign(ev.wheelDelta) *0.1;
+                    if(para.zoom < 0.1)para.zoom = 0.1;
+                    if(persp.zoom < 0.1)persp.zoom = 0.1;
+                    if(para.zoom > 10)para.zoom = 10;
+                    if(persp.zoom > 10)persp.zoom = 10;
+
+                    para.updateProjectionMatrix();
+                    persp.updateProjectionMatrix();
+                });
                 /**
                  * FOR TESTING ONLY SET THIS
                  */
                 $(_ref.camChanger).click(function () {
                     if ($(this).is(':checked')) {
                         _ref.camera = para;
-                        para.zoom = persp.zoom;
+                        // para.zoom = persp.zoom;
+                        // para.position.x = -900;
+                        // para.position.y = 197;
+                        // para.position.z = 775;
+                        // para.rotation.x = 0.4379923527728886;
+                        // para.rotation.y = -1.0507797936834526;
+                        // para.rotation.z = -0.826454729390485;
+                        // para.updateProjectionMatrix();
                     } else {
                         _ref.camera = persp;
                     }
