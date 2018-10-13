@@ -1,0 +1,467 @@
+<html>
+<head><!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+    <meta charset="UTF-8">
+    <!--<script src="\components\d3\d3.js" charset="utf-8"></script>-->
+    <!--<script src="https://d3js.org/d3.v5.min.js"></script>-->
+</head>
+<body>
+<dom-module id="sweva-visualization-kinect">
+    <template>
+        <style>
+            :host {
+                --paper-input-container-input: {
+                    max-height: 75px;
+                };
+                display: block;
+                box-sizing: border-box;
+                font-family: 'Verdana', sans-serif;
+                background-color: white;
+                position: relative;
+            }
+
+            .hidden {
+                display: none;
+            }
+
+            .menu {
+                padding: 8px;
+            }
+
+            .horizontal-flex {
+                display: flex;
+                flex-direction: row;
+                position: relative;
+                align-items: center;
+            }
+
+            .controls {
+                border-top: 1px solid #666;
+                height: 60px;
+            }
+
+            .controls > * {
+                flex: 1;
+            }
+
+            .
+            .label {
+                font-size: small;
+            }
+
+            .dialog-container {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                width: 100%;
+                box-sizing: border-box;
+                padding-bottom: 25px;
+            }
+
+            paper-dialog {
+                background: #fff;
+                width: 100%;
+            }
+
+            paper-button {
+            }
+
+            .flexed {
+                display: flex;
+            }
+
+            .overlay {
+                position: absolute;
+                display: block;
+                width: 99%;
+                height: 20px;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.1);
+                z-index: 2;
+                border: 3px solid #73AD21;
+                cursor: pointer;
+            }
+        </style>
+
+        <!--<div id="canvas" style="height: 100%;width: 100%; position: absolute;"></div>-->
+        <div>
+            <div id="canvas"></div>
+            <div id="pad" class="overlay">
+                <div class="flexed">
+                    <div id="humcount" class="flex-item" style="width: 25%">Menschen: 0</div>
+                    <div id="mindist" class="flex-item" style="width: 25%">Abstand: INFINITY</div>
+                    <div id="markers" class="flex-item" style="width: 25%">Erkannte Marker: 0</div>
+                    <div class="flex-item" style="width: 25%"><label><input type="checkbox" id="camchange"
+                                                                            name="changecamera"/>Orthographic
+                        camera</label>
+                    </div>
+                    <!--<div class="flex-item" style="width: 25%">Hallo</div>-->
+                </div>
+            </div>
+
+        </div>
+
+
+    </template>
+    <!--<script src="http://d3js.org/d3.v3.min.js"></script>-->
+    <script>
+
+        /**
+         * @customElement
+         * @polymer
+         */
+        class SWEVAVisualizationKinect extends Polymer.Element {
+
+            static get is() {
+                return 'sweva-visualization-kinect'
+            }
+
+            static get properties() {
+                return {
+                    /* properties meta data object just like 1.x */
+                    dimensions: {
+                        type: Object,
+                        value: {
+                            width: 1000,
+                            height: 800
+                        }
+                    },
+                    focuses: {
+                        type: Array,
+                        value: []
+                    },
+                    data: {
+                        type: Object,
+                        value: [],
+                        observer: 'dataChanged'
+                    },
+                    config: {
+                        type: Object,
+                        value: {}
+                        //observer: 'configChanged'
+                    },
+                    link: {
+                        type: String,
+                        value: ''
+                    }
+                }
+            }
+
+            /**
+             * Setter for new data
+             * @param value The new data
+             */
+            set(value) {
+                var _ref = this;
+                var visdata = value.output1.data;
+                var humans;
+                var robot;
+
+                //No humans or robot? Skip then.
+                if (!visdata.humans || !visdata.robot) {
+                    return;
+                }
+
+                //Clear the scene before adding objects to it
+                _ref.clear();
+
+                humans = visdata.humans;
+                robot = visdata.robot;
+
+
+                var counter = 0;
+                //Draw humans
+                var human = humans.points;
+                human.forEach(function (points) {
+                    counter++;
+                    points.forEach(function (point) {
+                        var spheregeometry = new THREE.SphereGeometry(10, 10, 10);
+                        var spherematerial = new THREE.MeshLambertMaterial({color: _ref.humanColors[counter]});
+                        var kugel = new THREE.Mesh(spheregeometry, spherematerial);
+                        kugel.translateX(point[0]);
+                        kugel.translateY(-point[2]);
+                        kugel.translateZ(point[1]);
+                        kugel.receiveShadow = true;
+                        kugel.castShadow = true;
+                        kugel.material.shading = THREE.SmoothShading;
+                        _ref.scene.add(kugel);
+                    });
+                });
+                //Draw robot
+                var spheres = robot.spheres;
+                spheres.forEach(function (point) {
+                    var spheregeometry = new THREE.SphereGeometry(point[3], 10, 10);
+                    var spherematerial = new THREE.MeshLambertMaterial({color: 0x0000ff});
+                    var kugel = new THREE.Mesh(spheregeometry, spherematerial);
+                    kugel.translateX(point[0]);
+                    kugel.translateY(-point[2]);
+                    kugel.translateZ(point[1]);
+                    kugel.receiveShadow = true;
+                    kugel.castShadow = true;
+                    _ref.scene.add(kugel);
+                });
+
+                //Show the markers
+                var robotMarkers = robot.markers;
+                console.log(JSON.stringify(robotMarkers));
+                robotMarkers.forEach(function (point) {
+                    var spheregeometry = new THREE.BoxGeometry(20, 20, 20);
+                    var spherematerial = new THREE.MeshBasicMaterial({color: 0xffffff});
+                    var kugel = new THREE.Mesh(spheregeometry, spherematerial);
+
+                    kugel.translateX(point[0]);
+                    kugel.translateY(-point[2]);
+                    kugel.translateZ(point[1]);
+                    _ref.scene.add(kugel);
+                });
+                //Add some light to feel comfortable
+                var light = new THREE.PointLight();
+                light.position.set(0, 0, 800);
+                _ref.scene.add(light);
+
+                //Should represent the kinect
+                var cubeBox = new THREE.BoxGeometry(40, 40, 40);
+                var cubeMat = new THREE.MeshLambertMaterial({color: 0xFFDC00});
+                var cube = new THREE.Mesh(cubeBox, cubeMat);
+                cube.add(new THREE.AxisHelper(1000));
+                cube.receiveShadow = true;
+                cube.castShadow = true;
+                _ref.scene.add(cube);
+
+                //Add the floor through the point 0,0,0
+                var planeBox = new THREE.BoxGeometry(2000, 2000, .1);
+                var planeMat = new THREE.MeshLambertMaterial({color: 0x00ff00, transparent: true, opacity: 0.2});
+                var plane = new THREE.Mesh(planeBox, planeMat);
+
+                plane.receiveShadow = true;
+
+                var size = 1000;
+                var divisions = 100;
+
+                var gridHelper = new THREE.GridHelper( size, divisions );
+                gridHelper.rotation.x = Math.PI/2;
+                _ref.scene.add( gridHelper );
+                // _ref.scene.add(plane);
+
+                //Refresh the human count and the distance in the headbar
+                this.humCount.textContent = "Menschen: " + humans.count;
+                this.minDist.textContent = "Abstand: " + visdata.distance;
+                this.markers.textContent = "Erkannte Marker: " + robot.markers.length;
+
+                //Some logging if needed
+                // console.log(JSON.stringify(_ref.camera.rotation));
+                // console.log(JSON.stringify(_ref.camera.position));
+            }
+
+            append(value) {
+                this.$.content.textContent += this.getText(value);
+            }
+
+            getText(value) {
+                var text = '';
+                if (typeof value === 'object') {
+                    text = JSON.stringify(value, null, 2);
+                } else {
+                    text = value;
+                }
+                return text;
+            }
+
+            clearThree(obj) {
+                while (obj.children.length > 0) {
+                    this.clearThree(obj.children[0])
+                    obj.remove(obj.children[0]);
+                }
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) obj.material.dispose();
+                if (obj.texture) obj.texture.dispose();
+            }
+
+            // Element behavior
+
+            resize(width, height) {
+                var _ref = this;
+                // console.log(width + ", " + height);
+                this.dimensions.width = width;
+                this.dimensions.height = height;
+                this.renderer.setSize(this.dimensions.width - 20, this.dimensions.height - 20);
+
+                // this.renderer.setSize(this.drawingSurface.width - 20, this.drawingSurface.height - 20);
+
+
+                // this.camera.aspect = ((this.dimensions.width - 20.0) / (this.dimensions.height - 20.0));
+                // this.camera.updateProjectionMatrix();
+                this.controls = new THREE.TrackballControls(_ref.camera, _ref.drawingSurface);
+                this.controls.rotateSpeed = 1.0;
+                this.controls.zoomSpeed = 1.2;
+                this.controls.panSpeed = 0.8;
+                this.controls.noZoom = false;
+                this.controls.noPan = false;
+                this.controls.staticMoving = false;
+                this.controls.dynamicDampingFactor = 0.3;
+                this.controls.keys = [65, 83, 68];
+            }
+
+
+            clear() {
+                var _ref = this;
+                this.clearThree(_ref.scene);
+                // this.svg.selectAll("*").remove();
+            }
+
+            ready() {
+                super.ready();
+                if (!this.initialized) {
+                    this.setup();
+                }
+                this.initialized = true;
+            }
+
+            setup() {
+                this.testArray = {
+                    "robot": {
+                        "spheres": [[23, -20, 171, 67], [-11, 45, 196, 35], [0, 24, 163, 30], [0, 42, 167, 30], [18, 27, 143, 34], [38, 29, 128, 30], [18, 18, 200, 30], [38, 19, 193, 30], [48, 22, 173, 30], [50, 25, 147, 30], [-28, 158, 188, 29], [-30, 120, 183, 32], [-30, 85, 178, 31], [-28, 48, 171, 32], [-73, 148, 239, 29], [-24, 147, 216, 38], [9, 152, 198, 32], [-118, 144, 262, 30], [-134, 143, 270, 22]],
+                        "markers": [[57, -24, 138], [18, 1, 162], [-17, -33, 174]]
+                    },
+                    "distance": -0.2829483879160166,
+                    "humans": {
+                        "count": 1,
+                        "points": [[[-171, 143, 351], [-165, 139, 347], [-182, 136, 346], [-171, 135, 351], [-161, 134, 352], [-153, 133, 357], [-148, 133, 363], [-185, 127, 351], [-182, 125, 352], [-178, 123, 353], [-171, 121, 352], [-163, 119, 354], [-158, 119, 357], [-152, 118, 362], [-146, 118, 368], [-190, 115, 365], [-188, 112, 364], [-139, 113, 372], [-163, 107, 359], [-140, 110, 371], [-113, 108, 368], [-32, 83, 286], [-26, 81, 283], [-172, 103, 363], [-170, 103, 368], [-165, 102, 370], [-161, 100, 366], [-165, 100, 369], [-177, 100, 373], [-31, 75, 279], [-98, 96, 363], [-131, 95, 363], [-169, 95, 366], [-39, 74, 286], [-112, 94, 365], [-164, 93, 363], [-61, 87, 343], [-123, 92, 363], [-180, 90, 358], [-80, 88, 354], [-143, 88, 358], [-40, 78, 316], [-109, 89, 366], [-170, 87, 359], [-70, 86, 355], [-136, 85, 357], [-33, 74, 310], [-110, 86, 366], [-177, 84, 358], [-77, 82, 353], [-144, 82, 355], [-42, 74, 323], [-115, 83, 363], [-177, 81, 358], [-78, 81, 358], [-136, 79, 355], [-190, 75, 340], [-104, 81, 369], [-161, 77, 353], [-62, 75, 345], [-131, 76, 354], [-198, 71, 335], [-114, 77, 366], [-186, 73, 346], [-97, 77, 370], [-170, 73, 356], [-199, 62, 302], [-132, 72, 355], [-188, 68, 337], [-106, 75, 376], [-162, 70, 352], [-205, 63, 318], [-128, 69, 355], [-182, 68, 355], [-181, 53, 274], [-133, 67, 354], [-182, 68, 361], [-202, 59, 315], [-127, 65, 355], [-171, 64, 353], [-197, 58, 319], [-121, 64, 359], [-164, 62, 353], [-197, 58, 332], [-113, 65, 374], [-143, 60, 353], [-171, 59, 351], [-198, 54, 321], [-178, 43, 258], [-114, 60, 370], [-171, 54, 343], [-154, 54, 351], [-131, 53, 352], [-114, 55, 369], [-161, 51, 352], [-136, 49, 351], [-115, 50, 362], [-159, 46, 351], [-134, 45, 348], [-115, 47, 366], [-156, 42, 348], [-131, 42, 349], [-114, 43, 372], [-153, 38, 347], [-129, 38, 349], [-112, 40, 377], [-148, 34, 345], [-126, 34, 350], [-166, 31, 337], [-142, 31, 344], [-120, 30, 353], [-162, 28, 347], [-135, 27, 345], [-116, 27, 363], [-156, 24, 345], [-132, 23, 346], [-114, 24, 366], [-152, 20, 343], [-129, 20, 347], [-111, 20, 368], [-152, 17, 344], [-129, 16, 345], [-112, 16, 364], [-157, 13, 345], [-134, 12, 344], [-117, 11, 358], [-166, 9, 346], [-143, 8, 340], [-125, 7, 347], [-111, 7, 367], [-157, 4, 340], [-138, 3, 339], [-121, 3, 347], [-108, 2, 365], [-165, 0, 343], [-148, 0, 341], [-130, -1, 342], [-116, -2, 352], [-165, -4, 343], [-141, -5, 339], [-123, -6, 350], [-107, -7, 368], [-151, -8, 339], [-133, -9, 342], [-117, -11, 348], [-174, -12, 346], [-151, -13, 336], [-135, -14, 339], [-119, -15, 344], [-107, -17, 362], [-155, -17, 335], [-140, -18, 335], [-127, -20, 345], [-112, -21, 352], [-170, -22, 339], [-151, -23, 333], [-138, -24, 339], [-123, -25, 345], [-110, -27, 354], [-164, -27, 333], [-149, -28, 333], [-138, -30, 343], [-124, -31, 346], [-110, -33, 356], [-162, -33, 335], [-148, -34, 339], [-135, -36, 349], [-118, -37, 349], [-168, -37, 332], [-151, -38, 336], [-136, -41, 351], [-117, -42, 354], [-158, -41, 331], [-142, -44, 345], [-119, -45, 347], [-159, -45, 331], [-143, -48, 345], [-121, -49, 348], [-156, -49, 330], [-138, -52, 349], [-114, -54, 354], [-150, -53, 336], [-127, -56, 347], [-158, -55, 331], [-136, -59, 352], [-164, -58, 330], [-140, -63, 356], [-164, -60, 330], [-134, -65, 352], [-155, -63, 332], [-124, -68, 350], [-147, -67, 337], [-166, -68, 333], [-132, -73, 351], [-150, -71, 334], [-117, -76, 354], [-134, -78, 352], [-150, -75, 334], [-164, -77, 331], [-126, -81, 346], [-147, -82, 344], [-155, -81, 330], [-120, -89, 358], [-133, -89, 350], [-149, -86, 334], [-161, -88, 334], [-121, -94, 354], [-133, -96, 351], [-149, -93, 335], [-158, -94, 331], [-253, -141, 486], [-121, -103, 354], [-128, -104, 352], [-134, -106, 352], [-148, -106, 344], [-151, -105, 333], [-156, -105, 329], [-159, -107, 327], [-135, -116, 348]]]
+                    }
+                };
+                var _ref = this;
+                // ------------------------------------------------
+                // BASIC SETUP
+                // ------------------------------------------------
+                console.log("SETUP");
+                // Create an empty scene
+                var scene = new THREE.Scene();
+                this.scene = scene;
+                // Create a basic perspective camera
+                var persp = new THREE.PerspectiveCamera(50, this.dimensions.width / this.dimensions.height, 0.1, 10000);
+                persp.position.x = -900;
+                persp.position.y = 197;
+                persp.position.z = 775;
+                persp.rotation.x = 0.4379923527728886;
+                persp.rotation.y = -1.0507797936834526;
+                persp.rotation.z = -0.826454729390485;
+
+
+                var para = new THREE.OrthographicCamera(this.dimensions.width / -2, this.dimensions.width / 2, this.dimensions.height / 2, this.dimensions.height / -2, 0.1, 10000);
+                para.position.x = -900;
+                para.position.y = 197;
+                para.position.z = 775;
+                para.rotation.x = 0.4379923527728886;
+                para.rotation.y = -1.0507797936834526;
+                para.rotation.z = -0.826454729390485;
+                this.camera = persp;
+                scene.add(para);
+                scene.add(persp);
+                // Create a renderer with Antialiasing
+                var renderer = new THREE.WebGLRenderer({antialias: true});
+                this.renderer = renderer;
+                // Configure renderer clear color
+                renderer.setClearColor("#ffffff");
+
+                // Configure renderer size
+
+
+                // Append Renderer to DOM
+                var drawingSurface = this.shadowRoot.querySelector('#canvas');
+                this.minDist = this.shadowRoot.querySelector('#mindist');
+                this.humCount = this.shadowRoot.querySelector('#humcount');
+                this.markers = this.shadowRoot.querySelector('#markers');
+                this.camChanger = this.shadowRoot.querySelector('#camchange');
+                this.drawingSurface = drawingSurface;
+                renderer.setSize(drawingSurface.width, drawingSurface.height);
+                drawingSurface.appendChild(renderer.domElement);
+
+                // ------------------------------------------------
+                // FUN STARTS HERE
+                // ------------------------------------------------
+
+
+                // Render Loop
+                this.controls = new THREE.TrackballControls(persp, drawingSurface);
+                this.controls.rotateSpeed = 1.0;
+                this.controls.zoomSpeed = 1.2;
+                this.controls.panSpeed = 0.8;
+                this.controls.noZoom = false;
+                this.controls.noPan = false;
+                this.controls.staticMoving = false;
+                this.controls.dynamicDampingFactor = 0.3;
+                this.controls.keys = [65, 83, 68];
+
+
+                this.paraControls = new THREE.TrackballControls(para, drawingSurface);
+                this.paraControls.rotateSpeed = 1.0;
+                this.paraControls.zoomSpeed = 1.2;
+                this.paraControls.panSpeed = 0.8;
+                this.paraControls.noZoom = false;
+                this.paraControls.noPan = false;
+                this.paraControls.staticMoving = false;
+                this.paraControls.dynamicDampingFactor = 0.3;
+                this.paraControls.keys = [65, 83, 68];
+
+
+                // this.camera.zoom = 0.5;
+                // this.camera.updateProjectionMatrix();
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+
+                var planeBox = new THREE.BoxGeometry(2000, 2000, .1);
+                var planeMat = new THREE.MeshLambertMaterial({color: 0x00ff00, transparent: true, opacity: 0.5});
+                var plane = new THREE.Mesh(planeBox, planeMat);
+                _ref.scene.add(plane);
+
+                this.humanColors = [0x7F4145, 0xBD3D3A, 0x3F69AA, 0xBE9EC9, 0xF1EA7F, 0x006E6D];
+
+                var testMQTT = {
+                    "output1": {
+                        "data": _ref.testArray
+                    }
+                };
+
+                /**
+                 * FOR TESTING ONLY SET THIS
+                 */
+                $(_ref.camChanger).click(function () {
+                    if ($(this).is(':checked')) {
+                        _ref.camera = para;
+                        para.zoom = persp.zoom;
+                    } else {
+                        _ref.camera = persp;
+                    }
+                });
+                this.set(testMQTT);
+                var render = function () {
+                    requestAnimationFrame(render);
+                    _ref.controls.update();
+                    _ref.paraControls.update();
+                    // cube.rotation.x += 0.01;
+                    // cube.rotation.y += 0.01;
+
+                    // Render the scene
+                    renderer.render(scene, _ref.camera);
+                };
+                // this.controls.addEventListener( 'change', render );
+                render();
+            }
+        }
+
+        window.customElements.define(SWEVAVisualizationKinect.is, SWEVAVisualizationKinect);
+    </script>
+</dom-module>
+</body>
+</html>
